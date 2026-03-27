@@ -11,12 +11,13 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { loginSchema, registerSchema } from "@/lib/validations"
 import { useMutation } from "@tanstack/react-query"
+import { Suspense } from "react"
 
 interface AuthFormProps {
   mode: "login" | "register"
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthFormInner({ mode }: AuthFormProps) {
   const router = useRouter()
   const { login, register } = useAuth()
   const searchParams = useSearchParams()
@@ -186,5 +187,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         </p>
       </div>
     </div>
+  )
+}
+
+export function AuthForm({ mode }: AuthFormProps) {
+  return (
+    <Suspense fallback={null}>
+      <AuthFormInner mode={mode} />
+    </Suspense>
   )
 }

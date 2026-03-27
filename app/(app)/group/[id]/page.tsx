@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { useAuth } from "@/components/auth-provider"
 import { DashboardHeader } from "@/components/dashboard-header"
-import {
-  AvailabilityGrid,
-  GroupOverlapGrid,
-  type DayAvailability,
-} from "@/components/availability-grid"
+import { AvailabilityGrid, GroupOverlapGrid, type DayAvailability } from "@/components/availability-grid"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -23,7 +19,14 @@ import {
 import { ArrowLeft, Copy, Users, Check, LinkIcon } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useState } from "react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import * as TabsPrimitive from "@radix-ui/react-tabs"
+import { motion } from "framer-motion"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -49,6 +52,10 @@ interface AvailabilityRow {
   slots: boolean[]
 }
 
+const tabs = [
+  { value: "my-availability", label: "Mi disponibilidad" },
+  { value: "group-overlap", label: "Overlap del grupo" },
+]
 export default function GroupPage({
   params,
 }: {
@@ -58,6 +65,7 @@ export default function GroupPage({
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
+  const [activeTab, setActiveTab] = useState("my-availability")
 
   const copyInviteCode = async () => {
     if (!groupData?.group.invite_code) return
@@ -268,10 +276,28 @@ export default function GroupPage({
         </div>
 
         {/* Tabs de disponibilidad */}
-        <Tabs defaultValue="my-availability" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="my-availability">Mi disponibilidad</TabsTrigger>
-            <TabsTrigger value="group-overlap">Overlap del grupo</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6 relative">
+            {tabs.map((tab) => (
+              <TabsPrimitive.Trigger
+                key={tab.value}
+                value={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className="relative z-10 px-4 py-1.5 text-sm font-medium transition-colors
+          data-[state=active]:text-primary-foreground
+          data-[state=inactive]:text-muted-foreground"
+              >
+                {/* El bg animado va DETRÁS del texto */}
+                {activeTab === tab.value && (
+                  <motion.span
+                    layoutId="bubble"
+                    className="absolute inset-0 z-[-1] rounded-md bg-primary"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                  />
+                )}
+                {tab.label}
+              </TabsPrimitive.Trigger>
+            ))}
           </TabsList>
 
           <TabsContent value="my-availability">
