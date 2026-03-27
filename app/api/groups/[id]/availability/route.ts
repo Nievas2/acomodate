@@ -3,10 +3,14 @@ import { sql } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { z } from 'zod'
 
-// Schema de validación inline (o importar desde validations.ts si lo tenés)
-const availabilitySchema = z.object({
+const daySchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   slots: z.array(z.boolean()).length(24),
+})
+
+// Acepta un batch de días: { days: [{ dayOfWeek, slots }, ...] }
+const availabilitySchema = z.object({
+  days: z.array(daySchema).min(1).max(7),
 })
 
 // GET — devuelve la disponibilidad de todos los miembros del grupo
@@ -32,7 +36,6 @@ export async function GET(
     }
 
     // Devolver disponibilidad de todos los miembros
-    // La DB guarda day_of_week (0-6) y slots (boolean[24])
     const availability = await sql`
       SELECT
         a.user_id,
@@ -52,8 +55,8 @@ export async function GET(
   }
 }
 
-// POST — guarda o actualiza la disponibilidad de un día para el usuario actual
-// Body: { dayOfWeek: 0-6, slots: boolean[24] }
+// POST — guarda o actualiza disponibilidad para uno o varios días en una sola petición
+// Body: { days: [{ dayOfWeek: 0-6, slots: boolean[24] }, ...] }
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -85,17 +88,21 @@ export async function POST(
       )
     }
 
-    const { dayOfWeek, slots } = result.data
+    const { days } = result.data
 
-    // Upsert: si ya existe el registro para este usuario/grupo/día, lo actualiza
-    await sql`
-      INSERT INTO availability (group_id, user_id, day_of_week, slots)
-      VALUES (${id}, ${session.userId}, ${dayOfWeek}, ${slots})
-      ON CONFLICT (user_id, group_id, day_of_week)
-      DO UPDATE SET
-        slots = ${slots},
-        updated_at = NOW()
-    `
+    // Upsert de todos los días en paralelo
+    await Promise.all(
+      days.map(({ dayOfWeek, slots }) =>
+        sql`
+          INSERT INTO availability (group_id, user_id, day_of_week, slots)
+          VALUES (${id}, ${session.userId}, ${dayOfWeek}, ${slots})
+          ON CONFLICT (user_id, group_id, day_of_week)
+          DO UPDATE SET
+            slots = ${slots},
+            updated_at = NOW()
+        `
+      )
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

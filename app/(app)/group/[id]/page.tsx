@@ -66,22 +66,28 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
     }
   }, [authLoading, user, router])
 
-  // Guardar un día completo cuando el usuario termina de editar
-  const handleUpdateDay = useCallback(async (dayOfWeek: number, slots: boolean[]) => {
-    // Optimistic update
+  // Recibe todos los días modificados en una sola interacción y hace UNA petición
+  const handleUpdateDays = useCallback(async (
+    days: { dayOfWeek: number; slots: boolean[] }[]
+  ) => {
+    if (days.length === 0) return
+
+    // Optimistic update para todos los días del batch
     mutateAvailability((current) => {
       if (!current) return current
 
       const filtered = current.availability.filter(
-        a => !(a.user_id === user?.id && a.day_of_week === dayOfWeek)
+        a => !(a.user_id === user?.id && days.some(d => d.dayOfWeek === a.day_of_week))
       )
 
-      filtered.push({
-        user_id: user!.id,
-        user_name: user!.username,
-        day_of_week: dayOfWeek,
-        slots,
-      })
+      for (const { dayOfWeek, slots } of days) {
+        filtered.push({
+          user_id: user!.id,
+          user_name: user!.username,
+          day_of_week: dayOfWeek,
+          slots,
+        })
+      }
 
       return { availability: filtered }
     }, false)
@@ -90,7 +96,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       await fetch(`/api/groups/${id}/availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dayOfWeek, slots }),
+        body: JSON.stringify({ days }),
       })
       mutateAvailability()
     } catch (error) {
@@ -236,7 +242,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               <AvailabilityGrid
                 availability={availability}
                 currentUserId={user.id}
-                onUpdateDay={handleUpdateDay}
+                onUpdateDays={handleUpdateDays}
                 memberCount={members.length}
               />
             </div>

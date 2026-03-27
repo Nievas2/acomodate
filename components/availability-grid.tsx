@@ -1,10 +1,7 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-
-// Cada slot es simplemente true/false (disponible o no)
-// Un día tiene 24 slots, uno por hora
 
 export interface DayAvailability {
   user_id: string
@@ -16,7 +13,8 @@ export interface DayAvailability {
 interface AvailabilityGridProps {
   availability: DayAvailability[]
   currentUserId: string
-  onUpdateDay: (dayOfWeek: number, slots: boolean[]) => void
+  /** Se llama UNA sola vez al soltar el mouse, con todos los días modificados */
+  onUpdateDays: (days: { dayOfWeek: number; slots: boolean[] }[]) => void
   memberCount: number
 }
 
@@ -33,15 +31,13 @@ const formatHour = (slot: number): string => {
 export function AvailabilityGrid({
   availability,
   currentUserId,
-  onUpdateDay,
+  onUpdateDays,
   memberCount,
 }: AvailabilityGridProps) {
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragValue, setDragValue] = useState(true)
-  const [draggedCells, setDraggedCells] = useState<Set<string>>(new Set())
+  const isDraggingRef = useRef(false)
+  const dragValueRef = useRef(true)
+  const dirtyDaysRef = useRef<Set<number>>(new Set())
 
-  // Estado local para los slots del usuario actual (editable)
-  // Mapa: dayOfWeek -> boolean[24]
   const [localSlots, setLocalSlots] = useState<Map<number, boolean[]>>(() => {
     const map = new Map<number, boolean[]>()
     for (const entry of availability) {
@@ -52,18 +48,48 @@ export function AvailabilityGrid({
     return map
   })
 
-  // Cuando llegan nuevos datos del servidor, sincronizar solo los días
-  // que no están siendo editados actualmente
+  const localSlotsRef = useRef(localSlots)
+  localSlotsRef.current = localSlots
+
+  // Referencia estable a onUpdateDays para usarla en el listener global
+  const onUpdateDaysRef = useRef(onUpdateDays)
+  onUpdateDaysRef.current = onUpdateDays
+
+  // Listener global en window: se registra una sola vez y captura el mouseup
+  // sin importar dónde suelte el usuario (dentro o fuera del componente).
+  useEffect(() => {
+    const handleWindowMouseUp = () => {
+      if (!isDraggingRef.current) return
+      isDraggingRef.current = false
+
+      const days = dirtyDaysRef.current
+      dirtyDaysRef.current = new Set()
+
+      if (days.size === 0) return
+
+      // Una sola llamada con todos los días modificados
+      const updates = Array.from(days).map(day => ({
+        dayOfWeek: day,
+        slots: localSlotsRef.current.get(day) ?? new Array(24).fill(false),
+      }))
+
+      onUpdateDaysRef.current(updates)
+    }
+
+    window.addEventListener('mouseup', handleWindowMouseUp)
+    return () => window.removeEventListener('mouseup', handleWindowMouseUp)
+  }, [])
+
   const getSlots = useCallback((dayOfWeek: number): boolean[] => {
     return localSlots.get(dayOfWeek) ?? new Array(24).fill(false)
   }, [localSlots])
 
   const handleMouseDown = useCallback((dayOfWeek: number, slotIndex: number) => {
-    const current = getSlots(dayOfWeek)
+    const current = localSlotsRef.current.get(dayOfWeek) ?? new Array(24).fill(false)
     const newValue = !current[slotIndex]
-    setDragValue(newValue)
-    setIsDragging(true)
-    setDraggedCells(new Set([`${dayOfWeek}-${slotIndex}`]))
+    isDraggingRef.current = true
+    dragValueRef.current = newValue
+    dirtyDaysRef.current = new Set([dayOfWeek])
 
     setLocalSlots(prev => {
       const next = new Map(prev)
@@ -72,56 +98,24 @@ export function AvailabilityGrid({
       next.set(dayOfWeek, slots)
       return next
     })
-  }, [getSlots])
+  }, [])
 
   const handleMouseEnter = useCallback((dayOfWeek: number, slotIndex: number) => {
-    if (!isDragging) return
-    const key = `${dayOfWeek}-${slotIndex}`
-    if (draggedCells.has(key)) return
-    setDraggedCells(prev => new Set([...prev, key]))
+    if (!isDraggingRef.current) return
+    dirtyDaysRef.current.add(dayOfWeek)
 
     setLocalSlots(prev => {
       const next = new Map(prev)
       const slots = [...(next.get(dayOfWeek) ?? new Array(24).fill(false))]
-      slots[slotIndex] = dragValue
+      if (slots[slotIndex] === dragValueRef.current) return prev
+      slots[slotIndex] = dragValueRef.current
       next.set(dayOfWeek, slots)
       return next
     })
-  }, [isDragging, dragValue, draggedCells])
-
-  const handleMouseUp = useCallback((dayOfWeek?: number) => {
-    if (!isDragging) return
-    setIsDragging(false)
-    setDraggedCells(new Set())
-
-    // Guardar el día que se terminó de editar
-    if (dayOfWeek !== undefined) {
-      const slots = localSlots.get(dayOfWeek) ?? new Array(24).fill(false)
-      onUpdateDay(dayOfWeek, slots)
-    }
-  }, [isDragging, localSlots, onUpdateDay])
-
-  // Al soltar fuera de la grilla también guardamos todos los días modificados
-  const handleGlobalMouseUp = useCallback(() => {
-    if (!isDragging) return
-    setIsDragging(false)
-    setDraggedCells(prev => {
-      const days = new Set<number>()
-      prev.forEach(key => days.add(parseInt(key.split('-')[0])))
-      days.forEach(day => {
-        const slots = localSlots.get(day) ?? new Array(24).fill(false)
-        onUpdateDay(day, slots)
-      })
-      return new Set()
-    })
-  }, [isDragging, localSlots, onUpdateDay])
+  }, [])
 
   return (
-    <div
-      className="overflow-x-auto"
-      onMouseUp={handleGlobalMouseUp}
-      onMouseLeave={handleGlobalMouseUp}
-    >
+    <div className="overflow-x-auto">
       {/* Leyenda */}
       <div className="flex items-center gap-6 mb-4 text-sm">
         <div className="flex items-center gap-2">
@@ -164,7 +158,6 @@ export function AvailabilityGrid({
                       )}
                       onMouseDown={() => handleMouseDown(dayIndex, slot)}
                       onMouseEnter={() => handleMouseEnter(dayIndex, slot)}
-                      onMouseUp={() => handleMouseUp(dayIndex)}
                       title={`${DAYS_FULL[dayIndex]} ${formatHour(slot)}`}
                     />
                   </div>
@@ -186,9 +179,7 @@ interface GroupOverlapGridProps {
 }
 
 export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGridProps) {
-  // Contar cuántos miembros están disponibles por día/hora
   const overlapMap = useMemo(() => {
-    // map[dayOfWeek][slotIndex] = lista de nombres disponibles
     const map: Map<number, Map<number, string[]>> = new Map()
 
     for (const entry of availability) {
