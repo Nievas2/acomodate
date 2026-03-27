@@ -1,24 +1,14 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { hashPassword, createSession } from "@/lib/auth"
-import { registerSchema } from "@/lib/validations"
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-
-    // 1. Validar datos
-    const result = registerSchema.safeParse(body)
-    if (!result.success) {
-      return NextResponse.json(
-        { error: result.error.errors[0].message },
-        { status: 400 },
-      )
-    }
-
+  
     // OJO: Si en el form usaste "name", asegúrate que el schema lo mapee a "username"
     // o cámbialo aquí según lo que diga tu registerSchema
-    const { email, password, username } = result.data
+    const { email, password, username } = body
 
     // 2. Verificar si existe
     const existingUsers = await sql`

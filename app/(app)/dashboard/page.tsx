@@ -1,15 +1,15 @@
-'use client'
+"use client"
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import useSWR from 'swr'
-import { useAuth } from '@/components/auth-provider'
-import { DashboardHeader } from '@/components/dashboard-header'
-import { CreateGroupDialog } from '@/components/create-group-dialog'
-import { JoinGroupDialog } from '@/components/join-group-dialog'
-import { Users, Calendar, ChevronRight } from 'lucide-react'
-import { Spinner } from '@/components/ui/spinner'
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import useSWR from "swr"
+import { useAuth } from "@/components/auth-provider"
+import { DashboardHeader } from "@/components/dashboard-header"
+import { CreateGroupDialog } from "@/components/create-group-dialog"
+import { JoinGroupDialog } from "@/components/join-group-dialog"
+import { Users, Calendar, ChevronRight } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -26,14 +26,15 @@ interface Group {
 export default function DashboardPage() {
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
-  const { data, isLoading: groupsLoading, mutate } = useSWR<{ groups: Group[] }>(
-    user ? '/api/groups' : null,
-    fetcher
-  )
+  const {
+    data,
+    isLoading: groupsLoading,
+    mutate,
+  } = useSWR<{ groups: Group[] }>(user ? "/api/groups" : null, fetcher)
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login')
+      router.push("/login")
     }
   }, [authLoading, user, router])
 
@@ -54,9 +55,9 @@ export default function DashboardPage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold">Your Groups</h1>
+            <h1 className="text-2xl font-bold">Tus grupos</h1>
             <p className="text-muted-foreground">
-              Manage your scheduling groups
+              Gestiona tus grupos de programación
             </p>
           </div>
           <div className="flex gap-3">
@@ -74,9 +75,10 @@ export default function DashboardPage() {
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Calendar className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">No groups yet</h2>
+            <h2 className="text-xl font-semibold mb-2">No tienes grupos</h2>
             <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-              Create a new group to start coordinating availability with friends or colleagues
+              Crea un nuevo grupo para empezar a coordinar la disponibilidad con
+              amigos o compañeros.
             </p>
             <div className="flex justify-center gap-3">
               <JoinGroupDialog onJoined={mutate} />
@@ -100,7 +102,8 @@ export default function DashboardPage() {
                         </p>
                       )}
                       <p className="text-sm text-muted-foreground">
-                        {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
+                        {group.member_count}{" "}
+                        {group.member_count === 1 ? "member" : "members"}
                       </p>
                     </div>
                   </div>

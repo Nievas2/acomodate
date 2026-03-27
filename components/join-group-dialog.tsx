@@ -58,14 +58,13 @@ export function JoinGroupDialog({ onJoined }: JoinGroupDialogProps) {
       <DialogTrigger asChild>
         <Button variant="outline" className="plastic-button">
           <UserPlus className="mr-2 h-4 w-4" />
-          Join Group
+          Entrar en un grupo
         </Button>
       </DialogTrigger>
       <DialogContent className="plastic-surface border-0">
         <DialogHeader>
-          <DialogTitle>Join a group</DialogTitle>
-          <DialogDescription>
-            Enter the invite code shared with you to join an existing group
+          <DialogTitle>Entrar en un grupo</DialogTitle>
+          <DialogDescription>Introduce el código de invitación que te han compartido para unirte a un grupo existente.
           </DialogDescription>
         </DialogHeader>
 
@@ -77,10 +76,10 @@ export function JoinGroupDialog({ onJoined }: JoinGroupDialogProps) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="inviteCode">Invite code</Label>
+            <Label htmlFor="inviteCode">Código de invitación</Label>
             <Input
               id="inviteCode"
-              placeholder="Enter 8-character code"
+              placeholder="Ingresa el código de invitación"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
               required
@@ -95,16 +94,16 @@ export function JoinGroupDialog({ onJoined }: JoinGroupDialogProps) {
               onClick={() => setOpen(false)}
               className="plastic-button"
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isLoading} className="plastic-button">
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Joining...
+                  Entrando...
                 </>
               ) : (
-                'Join group'
+                'Entrar al grupo'
               )}
             </Button>
           </div>

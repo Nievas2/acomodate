@@ -31,6 +31,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       email: "",
       password: "",
       username: "",
+      confirmPassword: "",
     },
   })
 
@@ -53,7 +54,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   })
 
   const onSubmit = handleSubmit((data) => {
-    console.log(data)
     mutate(data)
   })
 
@@ -65,15 +65,15 @@ export function AuthForm({ mode }: AuthFormProps) {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
               <Calendar className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="font-bold text-2xl">SyncUp</span>
+            <span className="font-bold text-2xl">Acomodate</span>
           </Link>
           <h1 className="text-2xl font-semibold mt-6">
-            {mode === "login" ? "Welcome back" : "Create your account"}
+            {mode === "login" ? "Bienvenido de nuevo" : "Crear una cuenta"}
           </h1>
           <p className="text-muted-foreground">
             {mode === "login"
-              ? "Sign in to manage your groups and availability"
-              : "Get started with free group scheduling"}
+              ? "Inicia sesión para gestionar tus grupos y disponibilidad."
+              : "Comience a programar reuniones grupales gratis."}
           </p>
         </div>
 
@@ -82,15 +82,15 @@ export function AuthForm({ mode }: AuthFormProps) {
             <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
               {mutationError instanceof Error
                 ? mutationError.message
-                : "An error occurred"}
+                : "Ocurrio un error"}
             </div>
           )}
 
           {mode === "register" && (
             <div className="space-y-2">
-              <Label htmlFor="username">Name</Label>
+              <Label htmlFor="username">Nombre de usuario</Label>
               <Input
-                placeholder="Your name"
+                placeholder="John Doe"
                 className={`plastic-input ${errors.username ? "border-destructive" : ""}`}
                 {...formRegister("username")}
               />
@@ -117,10 +117,10 @@ export function AuthForm({ mode }: AuthFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Contraseña</Label>
             <Input
               type="password"
-              placeholder="At least 8 characters"
+              placeholder="**********"
               className={`plastic-input ${errors.password ? "border-destructive" : ""}`}
               {...formRegister("password")}
             />
@@ -131,6 +131,23 @@ export function AuthForm({ mode }: AuthFormProps) {
             )}
           </div>
 
+          {mode === "register" && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+              <Input
+                type="password"
+                placeholder="**********"
+                className={`plastic-input ${errors.confirmPassword ? "border-destructive" : ""}`}
+                {...formRegister("confirmPassword")}
+              />
+              {errors.confirmPassword && (
+                <p className="text-xs text-destructive">
+                  {errors.confirmPassword.message as string}
+                </p>
+              )}
+            </div>
+          )}
+
           <Button
             type="submit"
             className="w-full plastic-button"
@@ -139,12 +156,12 @@ export function AuthForm({ mode }: AuthFormProps) {
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {mode === "login" ? "Signing in..." : "Creating account..."}
+                {mode === "login" ? "Iniciando sesión..." : "Registrando..."}
               </>
             ) : mode === "login" ? (
-              "Sign in"
+              "Iniciar sesión"
             ) : (
-              "Create account"
+              "Registrarse"
             )}
           </Button>
         </form>
@@ -152,16 +169,16 @@ export function AuthForm({ mode }: AuthFormProps) {
         <p className="text-center text-sm text-muted-foreground">
           {mode === "login" ? (
             <>
-              {"Don't have an account? "}
+              {"¿No tienes una cuenta? "}
               <Link href="/register" className="text-primary hover:underline">
-                Sign up
+                Registrate
               </Link>
             </>
           ) : (
             <>
-              Already have an account?{" "}
+              ¿Ya tienes una cuenta?{" "}
               <Link href="/login" className="text-primary hover:underline">
-                Sign in
+                Inicia sesión
               </Link>
             </>
           )}

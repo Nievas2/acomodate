@@ -1,10 +1,10 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { createGroupSchema, type CreateGroupInput } from '@/lib/validations'
-import { Button } from '@/components/ui/button'
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { createGroupSchema, type CreateGroupInput } from "@/lib/validations"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -12,11 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Plus } from 'lucide-react'
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Loader2, Plus } from "lucide-react"
 
 interface CreateGroupDialogProps {
   onCreated: () => void
@@ -24,7 +24,7 @@ interface CreateGroupDialogProps {
 
 export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
   const [open, setOpen] = useState(false)
-  const [apiError, setApiError] = useState('')
+  const [apiError, setApiError] = useState("")
 
   const {
     register,
@@ -34,25 +34,25 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
   } = useForm<CreateGroupInput>({
     resolver: zodResolver(createGroupSchema),
     defaultValues: {
-      name: '',
-      description: '',
+      name: "",
+      description: "",
     },
   })
 
   const onSubmit = handleSubmit(async (data) => {
-    setApiError('')
+    setApiError("")
 
     try {
-      const res = await fetch('/api/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       })
 
       const responseData = await res.json()
 
       if (!res.ok) {
-        setApiError(responseData.error || 'Failed to create group')
+        setApiError(responseData.error || "Failed to create group")
         return
       }
 
@@ -60,7 +60,7 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
       setOpen(false) // Cierra el modal
       onCreated() // Actualiza la lista
     } catch {
-      setApiError('An error occurred while creating the group')
+      setApiError("An error occurred while creating the group")
     }
   })
 
@@ -69,7 +69,7 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
     setOpen(newOpen)
     if (!newOpen) {
       reset()
-      setApiError('')
+      setApiError("")
     }
   }
 
@@ -83,9 +83,10 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
       </DialogTrigger>
       <DialogContent className="plastic-surface border-0">
         <DialogHeader>
-          <DialogTitle>Create a new group</DialogTitle>
+          <DialogTitle>Crear un nuevo grupo</DialogTitle>
           <DialogDescription>
-            Create a group to start coordinating availability with others
+            Crea un grupo para empezar a coordinar la disponibilidad con los
+            demás.
           </DialogDescription>
         </DialogHeader>
 
@@ -97,10 +98,10 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="name">Group name</Label>
+            <Label htmlFor="name">Nombre del grupo</Label>
             <Input
               id="name"
-              placeholder="e.g., Weekend Hangout, Team Meeting"
+              placeholder="Por ejemplo: Reunión de fin de semana, Reunión de equipo"
               className={`plastic-input ${errors.name ? "border-destructive" : ""}`}
               {...register("name")}
             />
@@ -110,16 +111,18 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description">Descripcion (opcional)</Label>
             <Textarea
               id="description"
-              placeholder="What is this group for?"
+              placeholder="¿Para que se utiliza el grupo?"
               className="plastic-input resize-none"
               rows={3}
               {...register("description")}
             />
             {errors.description && (
-              <p className="text-xs text-destructive">{errors.description.message}</p>
+              <p className="text-xs text-destructive">
+                {errors.description.message}
+              </p>
             )}
           </div>
 
@@ -130,16 +133,20 @@ export function CreateGroupDialog({ onCreated }: CreateGroupDialogProps) {
               onClick={() => handleOpenChange(false)}
               className="plastic-button"
             >
-              Cancel
+              Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="plastic-button">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="plastic-button"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  Creando...
                 </>
               ) : (
-                'Create group'
+                "Crear grupo"
               )}
             </Button>
           </div>

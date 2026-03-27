@@ -28,21 +28,21 @@ export function DashboardHeader() {
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
           <Calendar className="w-5 h-5 text-primary-foreground" />
         </div>
-        <span className="font-semibold text-lg">SyncUp</span>
+        <span className="font-semibold text-lg">Acomodate</span>
       </Link>
       
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="plastic-button flex items-center gap-2">
+          <Button variant="ghost" className="flex items-center gap-2 shadow-none">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
               <User className="w-4 h-4 text-primary" />
             </div>
-            <span className="hidden sm:inline">{user?.name}</span>
+            <span className="hidden sm:inline">{user?.username}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <div className="px-2 py-1.5 text-sm">
-            <p className="font-medium">{user?.name}</p>
+            <p className="font-medium">{user?.username}</p>
             <p className="text-muted-foreground text-xs truncate">{user?.email}</p>
           </div>
           <DropdownMenuSeparator />
