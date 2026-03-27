@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,8 @@ interface AuthFormProps {
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const { login, register } = useAuth()
-
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get("callbackUrl")
   const {
     register: formRegister,
     formState: { errors },
@@ -49,7 +50,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     },
     onSuccess: () => {
       reset()
-      router.push("/dashboard")
+        router.push(callbackUrl || '/dashboard')
     },
   })
 

@@ -1,13 +1,17 @@
-'use client'
+"use client"
 
-import { useEffect, useCallback, use } from 'react'
-import { useRouter } from 'next/navigation'
-import useSWR from 'swr'
-import { useAuth } from '@/components/auth-provider'
-import { DashboardHeader } from '@/components/dashboard-header'
-import { AvailabilityGrid, GroupOverlapGrid, type DayAvailability } from '@/components/availability-grid'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useEffect, useCallback, use } from "react"
+import { useRouter } from "next/navigation"
+import useSWR from "swr"
+import { useAuth } from "@/components/auth-provider"
+import { DashboardHeader } from "@/components/dashboard-header"
+import {
+  AvailabilityGrid,
+  GroupOverlapGrid,
+  type DayAvailability,
+} from "@/components/availability-grid"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -15,10 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { ArrowLeft, Copy, Users, Check } from 'lucide-react'
-import { Spinner } from '@/components/ui/spinner'
-import { useState } from 'react'
+} from "@/components/ui/dialog"
+import { ArrowLeft, Copy, Users, Check, LinkIcon } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
+import { useState } from "react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -44,73 +49,89 @@ interface AvailabilityRow {
   slots: boolean[]
 }
 
-export default function GroupPage({ params }: { params: Promise<{ id: string }> }) {
+export default function GroupPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const { id } = use(params)
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
-  const [copied, setCopied] = useState(false)
-
-  const { data: groupData, isLoading: groupLoading } = useSWR<{ group: Group; members: Member[] }>(
-    user ? `/api/groups/${id}` : null,
-    fetcher
-  )
-
-  const { data: availabilityData, mutate: mutateAvailability } = useSWR<{ availability: AvailabilityRow[] }>(
-    user ? `/api/groups/${id}/availability` : null,
-    fetcher
-  )
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login')
-    }
-  }, [authLoading, user, router])
-
-  // Recibe todos los días modificados en una sola interacción y hace UNA petición
-  const handleUpdateDays = useCallback(async (
-    days: { dayOfWeek: number; slots: boolean[] }[]
-  ) => {
-    if (days.length === 0) return
-
-    // Optimistic update para todos los días del batch
-    mutateAvailability((current) => {
-      if (!current) return current
-
-      const filtered = current.availability.filter(
-        a => !(a.user_id === user?.id && days.some(d => d.dayOfWeek === a.day_of_week))
-      )
-
-      for (const { dayOfWeek, slots } of days) {
-        filtered.push({
-          user_id: user!.id,
-          user_name: user!.username,
-          day_of_week: dayOfWeek,
-          slots,
-        })
-      }
-
-      return { availability: filtered }
-    }, false)
-
-    try {
-      await fetch(`/api/groups/${id}/availability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days }),
-      })
-      mutateAvailability()
-    } catch (error) {
-      console.error('Error al guardar disponibilidad:', error)
-      mutateAvailability()
-    }
-  }, [user, id, mutateAvailability])
+  const [copied, setCopied] = useState<"code" | "link" | null>(null)
 
   const copyInviteCode = async () => {
     if (!groupData?.group.invite_code) return
     await navigator.clipboard.writeText(groupData.group.invite_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied("code")
+    setTimeout(() => setCopied(null), 2000)
   }
+
+  const copyInviteLink = async () => {
+    if (!groupData?.group.invite_code) return
+    const link = `${window.location.origin}/join/${groupData.group.invite_code}`
+    await navigator.clipboard.writeText(link)
+    setCopied("link")
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const { data: groupData, isLoading: groupLoading } = useSWR<{
+    group: Group
+    members: Member[]
+  }>(user ? `/api/groups/${id}` : null, fetcher)
+
+  const { data: availabilityData, mutate: mutateAvailability } = useSWR<{
+    availability: AvailabilityRow[]
+  }>(user ? `/api/groups/${id}/availability` : null, fetcher)
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login")
+    }
+  }, [authLoading, user, router])
+
+  // Recibe todos los días modificados en una sola interacción y hace UNA petición
+  const handleUpdateDays = useCallback(
+    async (days: { dayOfWeek: number; slots: boolean[] }[]) => {
+      if (days.length === 0) return
+
+      // Optimistic update para todos los días del batch
+      mutateAvailability((current) => {
+        if (!current) return current
+
+        const filtered = current.availability.filter(
+          (a) =>
+            !(
+              a.user_id === user?.id &&
+              days.some((d) => d.dayOfWeek === a.day_of_week)
+            ),
+        )
+
+        for (const { dayOfWeek, slots } of days) {
+          filtered.push({
+            user_id: user!.id,
+            user_name: user!.username,
+            day_of_week: dayOfWeek,
+            slots,
+          })
+        }
+
+        return { availability: filtered }
+      }, false)
+
+      try {
+        await fetch(`/api/groups/${id}/availability`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ days }),
+        })
+        mutateAvailability()
+      } catch (error) {
+        console.error("Error al guardar disponibilidad:", error)
+        mutateAvailability()
+      }
+    },
+    [user, id, mutateAvailability],
+  )
 
   if (authLoading || !user || groupLoading) {
     return (
@@ -125,7 +146,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
       <div className="min-h-screen">
         <DashboardHeader />
         <main className="max-w-4xl mx-auto px-4 py-8">
-          <p className="text-muted-foreground">Grupo no encontrado o no tenés acceso.</p>
+          <p className="text-muted-foreground">
+            Grupo no encontrado o no tenés acceso.
+          </p>
         </main>
       </div>
     )
@@ -134,7 +157,9 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
   const { group, members } = groupData
 
   // Convertir la respuesta de la API al tipo que espera el grid
-  const availability: DayAvailability[] = (availabilityData?.availability ?? []).map(row => ({
+  const availability: DayAvailability[] = (
+    availabilityData?.availability ?? []
+  ).map((row) => ({
     user_id: row.user_id,
     user_name: row.user_name,
     day_of_week: row.day_of_week,
@@ -151,7 +176,7 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push("/dashboard")}
             className="plastic-button"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
@@ -173,7 +198,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
               <DialogTrigger asChild>
                 <Button variant="outline" className="plastic-button">
                   <Users className="w-4 h-4 mr-2" />
-                  {members.length} {members.length === 1 ? 'miembro' : 'miembros'}
+                  {members.length}{" "}
+                  {members.length === 1 ? "miembro" : "miembros"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="plastic-surface border-0">
@@ -195,10 +221,14 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
                         <p className="font-medium">
                           {member.name}
                           {member.id === group.owner_id && (
-                            <span className="ml-2 text-xs text-muted-foreground">(dueño)</span>
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              (dueño)
+                            </span>
                           )}
                         </p>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {member.email}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -207,23 +237,33 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
             </Dialog>
 
             {/* Código de invitación */}
-            <Button
-              variant="outline"
-              className="plastic-button font-mono"
-              onClick={copyInviteCode}
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-available" />
-                  ¡Copiado!
-                </>
-              ) : (
-                <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="plastic-button font-mono">
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2 text-green-500" />
+                      ¡Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      {group.invite_code}
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={copyInviteCode}>
                   <Copy className="w-4 h-4 mr-2" />
-                  {group.invite_code}
-                </>
-              )}
-            </Button>
+                  Copiar código
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={copyInviteLink}>
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Copiar link de invitación
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -237,7 +277,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <TabsContent value="my-availability">
             <div className="plastic-surface p-6">
               <p className="text-sm text-muted-foreground mb-4">
-                Marcá los horarios en los que estás disponible cada semana. Hacé click y arrastrá para marcar varios a la vez.
+                Marcá los horarios en los que estás disponible cada semana. Hacé
+                click y arrastrá para marcar varios a la vez.
               </p>
               <AvailabilityGrid
                 availability={availability}
@@ -251,7 +292,8 @@ export default function GroupPage({ params }: { params: Promise<{ id: string }> 
           <TabsContent value="group-overlap">
             <div className="plastic-surface p-6">
               <p className="text-sm text-muted-foreground mb-4">
-                Horarios en los que todos coinciden. Los números indican cuántas personas pueden en cada franja.
+                Horarios en los que todos coinciden. Los números indican cuántas
+                personas pueden en cada franja.
               </p>
               <GroupOverlapGrid
                 availability={availability}
