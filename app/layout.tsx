@@ -19,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="font-sans antialiased min-h-screen">
+     <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
+      <body className="font-sans antialiased min-h-screen bg-background text-foreground">
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
