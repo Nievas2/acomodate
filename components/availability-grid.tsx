@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface DayAvailability {
@@ -203,29 +203,46 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
     return overlapMap.get(dayOfWeek)?.get(slotIndex) ?? []
   }
 
-  const getOverlapColor = (count: number): string => {
-    if (count === 0) return 'bg-muted/30'
+  const getOverlapStyle = (count: number): React.CSSProperties => {
+    if (count === 0) return {}
     const ratio = count / memberCount
-    if (ratio === 1) return 'bg-available'
-    if (ratio >= 0.5) return 'bg-maybe'
-    return 'bg-unavailable/30'
+    // Hue: 0 (rojo) → 60 (amarillo) → 120 (verde)
+    const hue = Math.round(ratio * 120)
+    const saturation = 65
+    const lightness = 35
+    // Opacidad: mínimo 0.4 para que sea visible, máximo 1
+    const opacity = 0.4 + ratio * 0.6
+    return {
+      backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+      opacity,
+    }
   }
 
   return (
     <div className="overflow-x-auto">
       {/* Leyenda */}
-      <div className="flex items-center gap-6 mb-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-available" />
-          <span>Todos disponibles</span>
+      <div className="flex items-center gap-3 mb-4 text-sm flex-wrap">
+        <span className="text-muted-foreground text-xs">Overlap:</span>
+        <div className="flex items-center gap-1">
+          {[0.1, 0.3, 0.5, 0.7, 0.9, 1].map((ratio, i) => (
+            <div
+              key={i}
+              className="w-5 h-4 rounded"
+              style={{
+                backgroundColor: `hsl(${Math.round(ratio * 120)}, 65%, 35%)`,
+                opacity: 0.4 + ratio * 0.6,
+              }}
+            />
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-maybe" />
-          <span>Algunos disponibles</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>pocos</span>
+          <span>→</span>
+          <span>todos</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-muted/30" />
-          <span>Nadie disponible</span>
+        <div className="flex items-center gap-2 ml-2">
+          <div className="w-5 h-4 rounded bg-muted/30" />
+          <span className="text-xs text-muted-foreground">nadie</span>
         </div>
       </div>
 
@@ -258,9 +275,10 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
                   <div key={dayIndex} className="flex-1 min-w-12 px-0.5">
                     <div
                       className={cn(
-                        'h-6 rounded transition-colors relative',
-                        getOverlapColor(count)
+                        'h-6 rounded transition-all relative',
+                        count === 0 ? 'bg-muted/30' : ''
                       )}
+                      style={getOverlapStyle(count)}
                       title={tooltip}
                     >
                       {count > 0 && (
