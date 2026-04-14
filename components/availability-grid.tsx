@@ -7,16 +7,29 @@ import { X } from 'lucide-react'
 export interface DayAvailability {
   user_id: string
   user_name: string
-  day_of_week: number  // 0=lunes … 6=domingo
-  slots: boolean[]     // longitud 24
+  day_of_week: number
+  slots: boolean[]
+}
+
+// Nuevo: tipo con email para el botón de Calendar
+export interface MemberInfo {
+  id: string
+  name: string
+  email: string
 }
 
 interface AvailabilityGridProps {
   availability: DayAvailability[]
   currentUserId: string
-  /** Se llama UNA sola vez al soltar el mouse, con todos los días modificados */
   onUpdateDays: (days: { dayOfWeek: number; slots: boolean[] }[]) => void
   memberCount: number
+}
+
+// GroupOverlapGrid ahora recibe members para tener los emails
+interface GroupOverlapGridProps {
+  availability: DayAvailability[]
+  memberCount: number
+  members: MemberInfo[]  // <-- nuevo
 }
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -94,17 +107,55 @@ function RichTooltip({ users, memberCount, label, visible, x, y }: RichTooltipPr
   )
 }
 
+// ─── Helpers para Google Calendar URL ─────────────────────────────────────────
+
+function buildCalendarUrl(
+  label: string,
+  dayOfWeek: number,  // 0=lunes … 6=domingo (nuestra convención)
+  slotHour: number,
+  guests: MemberInfo[]
+): string {
+  // Calcular la próxima ocurrencia de ese día de semana
+  // JS usa 0=domingo…6=sábado, nosotros 0=lunes…6=domingo
+  const jsTargetDay = (dayOfWeek + 1) % 7
+  const today = new Date()
+  const diff = (jsTargetDay - today.getDay() + 7) % 7 || 7  // mínimo 1 día adelante
+  const eventDate = new Date(today)
+  eventDate.setDate(today.getDate() + diff)
+  eventDate.setHours(slotHour, 0, 0, 0)
+
+  const endDate = new Date(eventDate)
+  endDate.setHours(slotHour + 1)  // 1 hora de duración por defecto
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
+    `T${pad(d.getHours())}${pad(d.getMinutes())}00`
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Reunión — ${label}`,
+    dates: `${fmt(eventDate)}/${fmt(endDate)}`,
+    details: `Creado desde el planificador de disponibilidad.\nDisponibles: ${guests.map(g => g.name).join(', ')}`,
+    add: guests.map(g => g.email).join(','),
+  })
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
 // ─── Sidebar de detalle ───────────────────────────────────────────────────────
 
 interface SlotSidebarProps {
-  users: string[]
-  memberCount: number
+  users: MemberInfo[]
+  absentCount: number
   label: string
+  dayOfWeek: number
+  slotHour: number
   onClose: () => void
 }
 
-function SlotSidebar({ users, memberCount, label, onClose }: SlotSidebarProps) {
-  const absent = memberCount - users.length
+function SlotSidebar({ users, absentCount, label, dayOfWeek, slotHour, onClose }: SlotSidebarProps) {
+  const calendarUrl = buildCalendarUrl(label, dayOfWeek, slotHour, users)
 
   return (
     <>
@@ -114,7 +165,7 @@ function SlotSidebar({ users, memberCount, label, onClose }: SlotSidebarProps) {
           <div>
             <p className="font-semibold text-sm">{label}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {users.length} de {memberCount} disponibles
+              {users.length} de {users.length + absentCount} disponibles
             </p>
           </div>
           <button
@@ -126,30 +177,63 @@ function SlotSidebar({ users, memberCount, label, onClose }: SlotSidebarProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+          {/* Botón crear Meet — solo si hay al menos 1 disponible */}
+          {users.length > 0 && (
+            <a
+              href={calendarUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2.5 w-full px-4 py-2.5 rounded-lg
+                border border-border bg-background hover:bg-muted/40 active:scale-[0.98]
+                transition-all text-sm font-medium shadow-sm select-none"
+            >
+              {/* Ícono de Google Calendar */}
+              <svg width="18" height="18" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="4" y="8" width="40" height="36" rx="4" fill="white"/>
+                <rect x="4" y="8" width="40" height="36" rx="4" stroke="#DADCE0" strokeWidth="1.5"/>
+                <rect x="4" y="14" width="40" height="6" fill="#4285F4"/>
+                <rect x="4" y="8" width="40" height="11" rx="4" fill="#4285F4"/>
+                <rect x="4" y="14" width="40" height="5" fill="#4285F4"/>
+                <circle cx="15" cy="11" r="2.5" fill="white"/>
+                <circle cx="33" cy="11" r="2.5" fill="white"/>
+                <text x="24" y="36" textAnchor="middle" fontSize="15" fontWeight="700" fill="#4285F4" fontFamily="Google Sans, sans-serif">
+                  {new Date().getDate()}
+                </text>
+              </svg>
+              Crear Meet en Google Calendar
+            </a>
+          )}
+
+          {/* Lista de disponibles */}
           {users.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Disponibles ({users.length})
               </p>
               <div className="space-y-2.5">
-                {users.map((name) => (
-                  <div key={name} className="flex items-center gap-3">
-                    <UserAvatar name={name} size="md" />
-                    <span className="text-sm font-medium">{name}</span>
-                    <span className="ml-auto text-xs text-green-500 font-bold">✓</span>
+                {users.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    <UserAvatar name={member.name} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{member.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                    </div>
+                    <span className="text-xs text-green-500 font-bold shrink-0">✓</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {absent > 0 && (
+          {/* No disponibles */}
+          {absentCount > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                No disponibles ({absent})
+                No disponibles ({absentCount})
               </p>
               <p className="text-xs text-muted-foreground">
-                {absent} {absent === 1 ? 'persona no marcó' : 'personas no marcaron'} este horario.
+                {absentCount} {absentCount === 1 ? 'persona no marcó' : 'personas no marcaron'} este horario.
               </p>
             </div>
           )}
@@ -295,12 +379,7 @@ export function AvailabilityGrid({
   )
 }
 
-// ─── GroupOverlapGrid con tooltip rico + sidebar ──────────────────────────────
-
-interface GroupOverlapGridProps {
-  availability: DayAvailability[]
-  memberCount: number
-}
+// ─── GroupOverlapGrid con tooltip rico + sidebar + botón Calendar ─────────────
 
 interface TooltipState {
   visible: boolean
@@ -312,27 +391,38 @@ interface TooltipState {
 
 interface SidebarState {
   open: boolean
-  users: string[]
+  users: MemberInfo[]
+  absentCount: number
   label: string
+  dayOfWeek: number
+  slotHour: number
 }
 
-export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGridProps) {
+export function GroupOverlapGrid({ availability, memberCount, members }: GroupOverlapGridProps) {
   const [tooltip, setTooltip] = useState<TooltipState>({
     visible: false, x: 0, y: 0, users: [], label: '',
   })
   const [sidebar, setSidebar] = useState<SidebarState>({
-    open: false, users: [], label: '',
+    open: false, users: [], absentCount: 0, label: '', dayOfWeek: 0, slotHour: 0,
   })
 
+  // Mapa email/info por user_id para lookup rápido
+  const memberMap = useMemo(() => {
+    const map = new Map<string, MemberInfo>()
+    members.forEach(m => map.set(m.id, m))
+    return map
+  }, [members])
+
+  // overlapMap ahora guarda user_ids en lugar de nombres
   const overlapMap = useMemo(() => {
-    const map: Map<number, Map<number, string[]>> = new Map()
+    const map: Map<number, Map<number, string[]>> = new Map()  // day -> slot -> user_ids[]
     for (const entry of availability) {
       if (!map.has(entry.day_of_week)) map.set(entry.day_of_week, new Map())
       const dayMap = map.get(entry.day_of_week)!
       entry.slots.forEach((available, slotIndex) => {
         if (available) {
           const existing = dayMap.get(slotIndex) ?? []
-          existing.push(entry.user_name)
+          existing.push(entry.user_id)
           dayMap.set(slotIndex, existing)
         }
       })
@@ -340,7 +430,7 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
     return map
   }, [availability])
 
-  const getUsers = (dayOfWeek: number, slotIndex: number): string[] =>
+  const getUserIds = (dayOfWeek: number, slotIndex: number): string[] =>
     overlapMap.get(dayOfWeek)?.get(slotIndex) ?? []
 
   const getOverlapStyle = (count: number): React.CSSProperties => {
@@ -352,13 +442,14 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
   }
 
   const handleMouseEnterCell = (e: React.MouseEvent, dayOfWeek: number, slot: number) => {
-    const users = getUsers(dayOfWeek, slot)
-    if (users.length === 0) return
+    const ids = getUserIds(dayOfWeek, slot)
+    if (ids.length === 0) return
+    const names = ids.map(id => memberMap.get(id)?.name ?? id)
     setTooltip({
       visible: true,
       x: e.clientX,
       y: e.clientY,
-      users,
+      users: names,
       label: `${DAYS_FULL[dayOfWeek]} ${formatHour(slot)}`,
     })
   }
@@ -372,10 +463,23 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
   }
 
   const handleClickCell = (dayOfWeek: number, slot: number) => {
-    const users = getUsers(dayOfWeek, slot)
-    if (users.length === 0) return
+    const ids = getUserIds(dayOfWeek, slot)
+    if (ids.length === 0) return
     setTooltip(prev => ({ ...prev, visible: false }))
-    setSidebar({ open: true, users, label: `${DAYS_FULL[dayOfWeek]} ${formatHour(slot)}` })
+
+    // Resolver MemberInfo completo para los disponibles
+    const availableMembers = ids
+      .map(id => memberMap.get(id))
+      .filter((m): m is MemberInfo => m !== undefined)
+
+    setSidebar({
+      open: true,
+      users: availableMembers,
+      absentCount: memberCount - availableMembers.length,
+      label: `${DAYS_FULL[dayOfWeek]} ${formatHour(slot)}`,
+      dayOfWeek,
+      slotHour: slot,
+    })
   }
 
   return (
@@ -392,14 +496,15 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
       {sidebar.open && (
         <SlotSidebar
           users={sidebar.users}
-          memberCount={memberCount}
+          absentCount={sidebar.absentCount}
           label={sidebar.label}
+          dayOfWeek={sidebar.dayOfWeek}
+          slotHour={sidebar.slotHour}
           onClose={() => setSidebar(prev => ({ ...prev, open: false }))}
         />
       )}
 
       <div className="overflow-x-auto">
-        {/* Leyenda */}
         <div className="flex items-center gap-3 mb-4 text-sm flex-wrap">
           <span className="text-muted-foreground text-xs">Overlap:</span>
           <div className="flex items-center gap-1">
@@ -443,8 +548,8 @@ export function GroupOverlapGrid({ availability, memberCount }: GroupOverlapGrid
                   {formatHour(slot)}
                 </div>
                 {DAYS.map((_, dayIndex) => {
-                  const users = getUsers(dayIndex, slot)
-                  const count = users.length
+                  const ids = getUserIds(dayIndex, slot)
+                  const count = ids.length
 
                   return (
                     <div key={dayIndex} className="flex-1 min-w-12 px-0.5">

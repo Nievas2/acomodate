@@ -457,6 +457,7 @@ export default function GroupPage({
               <GroupOverlapGrid
                 availability={filteredAvailability}
                 memberCount={filteredMemberCount}
+                members={members.map(m => ({ id: m.id, name: m.name, email: m.email }))}
               />
             </div>
           </TabsContent>
