@@ -21,7 +21,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Copy, Users, Check, LinkIcon } from "lucide-react"
+import {
+  ArrowLeft,
+  Copy,
+  Users,
+  Check,
+  LinkIcon,
+  AlertTriangle,
+  UserMinus,
+} from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { useState } from "react"
 import {
@@ -84,6 +92,9 @@ export default function GroupPage({
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [activeTab, setActiveTab] = useState("my-availability")
 
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+
   // Subgrupos seleccionados — viven en los search params para ser compartibles
   const selectedSubgroupIds = parseSubgroupIds(searchParams.get("sg"))
 
@@ -102,7 +113,11 @@ export default function GroupPage({
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const { data: groupData, isLoading: groupLoading } = useSWR<{
+  const {
+    data: groupData,
+    isLoading: groupLoading,
+    mutate: mutateGroup,
+  } = useSWR<{
     group: Group
     members: Member[]
   }>(user ? `/api/groups/${id}` : null, fetcher)
@@ -265,11 +280,25 @@ export default function GroupPage({
   const { group, members } = groupData
   const subgroups = subgroupsData?.subgroups ?? []
   const isAdmin =
-    members.find((m) => m.id === user.id) !== undefined &&
-    (group.owner_id === user.id || true) // ajustar según tu lógica de roles
-  // Más preciso: verificar el role del usuario en group_members
-  // Por ahora usamos: es admin si es el owner
+    members.some((m) => m.id === user.id) && group.owner_id === user.id
   const isOwner = group.owner_id === user.id
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (confirmRemoveId !== memberId) {
+      setConfirmRemoveId(memberId)
+      return
+    }
+    setRemovingMemberId(memberId)
+    setConfirmRemoveId(null)
+    try {
+      await fetch(`/api/groups/${id}?userId=${memberId}`, { method: "DELETE" })
+      mutateGroup()
+    } catch (err) {
+      console.error("Error al eliminar miembro:", err)
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
 
   return (
     <div className="min-h-screen pb-8">
@@ -315,28 +344,83 @@ export default function GroupPage({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3 mt-4">
-                  {members.map((member) => (
-                    <div key={member.id} className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary">
-                          {member.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium">
-                          {member.name}
-                          {member.id === group.owner_id && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              (dueño)
+                  {members.map((member) => {
+                    const isOwner = member.id === group.owner_id
+                    const isSelf = member.id === user.id
+                    const isConfirming = confirmRemoveId === member.id
+                    const isRemoving = removingMemberId === member.id
+                    const canRemove = isAdmin && !isOwner && !isSelf
+                    return (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between gap-3 group/member"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                            <span className="text-sm font-medium text-primary">
+                              {member.name.charAt(0).toUpperCase()}
                             </span>
-                          )}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {member.email}
-                        </p>
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {member.name}
+                              {member.id === group.owner_id && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  (dueño)
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {member.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        {canRemove && (
+                          <div className="shrink-0 flex items-center justify-end gap-1.5 ">
+                            {isConfirming ? (
+                              <>
+                                <span className="text-xs text-destructive flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  ¿Confirmar?
+                                </span>
+                                <button
+                                  onClick={() => handleRemoveMember(member.id)}
+                                  disabled={isRemoving}
+                                  className="text-xs px-2 py-0.5 rounded bg-destructive text-destructive-foreground
+                                    hover:bg-destructive/80 transition-colors disabled:opacity-50"
+                                >
+                                  Sí
+                                </button>
+                                <button
+                                  onClick={() => setConfirmRemoveId(null)}
+                                  className="text-xs px-2 py-0.5 rounded border border-border
+                                    hover:bg-muted transition-colors"
+                                >
+                                  No
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleRemoveMember(member.id)}
+                                disabled={isRemoving}
+                                className="opacity-100 md:opacity-0 md:group-hover/member:opacity-100 transition-opacity
+                                  p-1.5 rounded hover:bg-destructive/10 hover:text-destructive
+                                  text-muted-foreground disabled:opacity-30"
+                                title="Eliminar del grupo"
+                              >
+                                {isRemoving ? (
+                                  <span className="text-xs">…</span>
+                                ) : (
+                                  <UserMinus className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </DialogContent>
             </Dialog>
@@ -457,7 +541,11 @@ export default function GroupPage({
               <GroupOverlapGrid
                 availability={filteredAvailability}
                 memberCount={filteredMemberCount}
-                members={members.map(m => ({ id: m.id, name: m.name, email: m.email }))}
+                members={members.map((m) => ({
+                  id: m.id,
+                  name: m.name,
+                  email: m.email,
+                }))}
               />
             </div>
           </TabsContent>

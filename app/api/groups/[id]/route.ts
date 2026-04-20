@@ -72,7 +72,7 @@ export async function GET(
     )
   }
 }
-
+ 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -80,42 +80,72 @@ export async function DELETE(
   try {
     const session = await getSession()
     const { id } = await params
-    
+ 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    
-    // Check if user is the owner
-    const groups = await sql`
-      SELECT owner_id FROM groups WHERE id = ${id}
-    `
-    
+ 
+    const { searchParams } = new URL(request.url)
+    const targetUserId = searchParams.get('userId')
+ 
+    // ── Eliminar un miembro (admin only) ──────────────────────────────────────
+    if (targetUserId) {
+      // Verificar que el que pide es admin/owner
+      const requester = await sql`
+        SELECT role FROM group_members
+        WHERE group_id = ${id} AND user_id = ${session.userId}
+      `
+      if (requester.length === 0) {
+        return NextResponse.json({ error: 'Not a member' }, { status: 403 })
+      }
+ 
+      const group = await sql`SELECT owner_id FROM groups WHERE id = ${id}`
+      if (group.length === 0) {
+        return NextResponse.json({ error: 'Group not found' }, { status: 404 })
+      }
+ 
+      const isAdmin = requester[0].role === 'admin' || group[0].owner_id === session.userId
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Only admins can remove members' }, { status: 403 })
+      }
+ 
+      // No se puede eliminar al owner
+      if (targetUserId === group[0].owner_id) {
+        return NextResponse.json({ error: 'Cannot remove the group owner' }, { status: 400 })
+      }
+ 
+      // Eliminar de group_members (availability se borra por CASCADE en group_id+user_id
+      // pero aquí lo hacemos explícito para limpiar también subgroup_members)
+      await sql`
+        DELETE FROM subgroup_members
+        WHERE user_id = ${targetUserId}
+          AND subgroup_id IN (SELECT id FROM subgroups WHERE group_id = ${id})
+      `
+      await sql`
+        DELETE FROM availability
+        WHERE user_id = ${targetUserId} AND group_id = ${id}
+      `
+      await sql`
+        DELETE FROM group_members
+        WHERE group_id = ${id} AND user_id = ${targetUserId}
+      `
+ 
+      return NextResponse.json({ success: true })
+    }
+ 
+    // ── Eliminar el grupo completo (solo owner) ───────────────────────────────
+    const groups = await sql`SELECT owner_id FROM groups WHERE id = ${id}`
     if (groups.length === 0) {
-      return NextResponse.json(
-        { error: 'Group not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Group not found' }, { status: 404 })
     }
-    
     if (groups[0].owner_id !== session.userId) {
-      return NextResponse.json(
-        { error: 'Only the group owner can delete this group' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Only the group owner can delete this group' }, { status: 403 })
     }
-    
-    // Delete group (cascade will delete members and availability)
+ 
     await sql`DELETE FROM groups WHERE id = ${id}`
-    
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Delete group error:', error)
-    return NextResponse.json(
-      { error: 'An error occurred' },
-      { status: 500 }
-    )
+    console.error('Delete error:', error)
+    return NextResponse.json({ error: 'An error occurred' }, { status: 500 })
   }
 }
