@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     if (existingUsers.length > 0) {
       return NextResponse.json(
-        { error: "An account with this email already exists" },
+        { error: "ya existe una cuenta con ese correo" },
         { status: 409 },
       )
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     console.error(error)
 
     return NextResponse.json(
-      { error: error.message || "An error occurred during registration" },
+      { error: error.message || "Ocurrio un error" },
       { status: 500 },
     )
   }

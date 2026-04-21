@@ -43,15 +43,19 @@ export function AuthFormInner({ mode }: AuthFormProps) {
     error: mutationError,
   } = useMutation({
     mutationFn: async (data: any) => {
-      if (mode === "login") {
-        return await login(data.email, data.password)
-      } else {
-        return await register(data.email, data.password, data.username)
+      const result = mode === "login"
+        ? await login(data.email, data.password)
+        : await register(data.email, data.password, data.username)
+
+      if (!result.success) {
+        throw new Error(result.error || "Ocurrió un error inesperado")
       }
+
+      return result
     },
     onSuccess: () => {
       reset()
-        router.push(callbackUrl || '/dashboard')
+      router.push(callbackUrl || '/dashboard')
     },
   })
 
